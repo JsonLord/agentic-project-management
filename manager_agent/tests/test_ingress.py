@@ -9,29 +9,34 @@ async def test_process_new_project_flow():
     # Mock using the REAL URLs from settings
     plandex_url = settings.PLANDEX_URL
     dashboard_url = settings.DASHBOARD_URL
-    jules_url = settings.JULES_API_URL
+    coding_cli_url = settings.CODING_CLI_URL
 
     async with respx.mock(base_url=plandex_url) as plandex_mock, \
                respx.mock(base_url=dashboard_url) as dashboard_mock, \
-               respx.mock(base_url=jules_url) as jules_mock:
+               respx.mock(base_url=coding_cli_url) as coding_mock:
 
         # Setup Mocks
         plandex_mock.post("/api/plan").mock(return_value=Response(200, json={"tasks": [{"title": "Setup", "type": "Code"}]}))
         dashboard_mock.post("/api/tasks").mock(return_value=Response(200, json={"id": 1}))
-        jules_mock.post("/api/sessions").mock(return_value=Response(200, json={"session_id": "sess_1"}))
-        jules_mock.post("/api/sessions/sess_1/tasks").mock(return_value=Response(200, json={"status": "ok"}))
+        # Mocking upload-to-git
+        coding_mock.post("/api/huggingface/upload-to-git").mock(return_value=Response(200, json={"status": "ok"}))
 
         # Create Payload
         payload = WebhookPayload(
             type="new_project",
             description="Build a rocket",
-            project_name="RocketApp"
+            project_name="RocketApp",
+            space_id="rocket-space",
+            repo_url="https://github.com/rocket/app"
         )
 
-        # Run the logic directly (bypass FastAPI routing to test orchestration)
+        # Run the logic directly
         await process_new_project(payload)
 
         # Assertions
         assert plandex_mock.calls.last.request.method == "POST"
         assert dashboard_mock.calls.last.request.method == "POST"
-        assert jules_mock.calls.call_count == 2 # Create session + Submit task
+
+        # Verify Coding CLI call
+        assert coding_mock.calls.last.request.method == "POST"
+        assert b"rocket-space" in coding_mock.calls.last.request.content

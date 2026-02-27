@@ -1,5 +1,5 @@
 import httpx
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from app.core.config import settings
 
 class DashboardClient:
@@ -12,21 +12,19 @@ class DashboardClient:
             response.raise_for_status()
             return response.json()
 
-    async def get_project_status(self, project_name: str) -> str:
+    async def get_project_task(self, project_name: str) -> Optional[Dict[str, Any]]:
         """
-        Helper to find the status of a project.
-        Assumes there is a task representing the project or we derive it.
-        For MVP: We look for a task with title 'Project: {project_name}'
+        Helper to find the project task.
         """
         try:
             state = await self.get_state()
             tasks = state.get("tasks", [])
             for task in tasks:
                 if task.get("title") == f"Project: {project_name}":
-                    return task.get("status", "Planned")
-            return "Planned"
+                    return task
+            return None
         except Exception:
-            return "Planned"
+            return None
 
     async def create_task(self, title: str, task_type: str, priority: str, status: str = "Planned", assignee: Optional[int] = None) -> Dict[str, Any]:
         payload = {
@@ -34,7 +32,6 @@ class DashboardClient:
             "type": task_type,
             "priority": priority,
             "status": status,
-            "id": 0, # Placeholder
             "assignee": assignee,
             "tags": [],
             "comments": 0

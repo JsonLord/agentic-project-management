@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 from app.services.dashboard import DashboardClient
 from app.services.plandex import PlandexClient
-from app.services.jules import JulesClient
+from app.services.coding_cli import CodingCLIClient
 from app.core.workflow import WorkflowManager, ProjectState
 
 router = APIRouter()
@@ -13,6 +13,7 @@ class WebhookPayload(BaseModel):
     description: Optional[str] = None
     project_name: Optional[str] = None
     repo_url: Optional[str] = None
+    space_id: Optional[str] = None
 
 class GitHubCommit(BaseModel):
     id: str
@@ -46,7 +47,7 @@ async def handle_github_webhook(payload: GitHubPushPayload, background_tasks: Ba
 async def process_new_project(payload: WebhookPayload):
     dashboard = DashboardClient()
     plandex = PlandexClient()
-    jules = JulesClient()
+    coding_cli = CodingCLIClient()
 
     try:
         plan = await plandex.generate_plan(payload.description or "No Description")
@@ -72,38 +73,54 @@ async def process_new_project(payload: WebhookPayload):
             status="Planned"
         )
 
-    session_id = await jules.create_session(f"Project: {project_name}")
-
-    if tasks:
-        first_task = tasks[0]
-        await jules.submit_task(session_id, f"Implement: {first_task.get('title')}")
+    if payload.space_id and payload.repo_url:
+        try:
+            await coding_cli.upload_to_git(
+                space_id=payload.space_id,
+                repo_url=payload.repo_url,
+                message=f"Initialize project: {project_name}"
+            )
+        except Exception as e:
+            print(f"Error syncing to git: {e}")
 
 async def process_github_push(payload: GitHubPushPayload):
     dashboard = DashboardClient()
     repo_name = payload.repository.get("name", "unknown_repo")
 
     # Get current status
-    current_status_str = await dashboard.get_project_status(repo_name)
+    project_task = await dashboard.get_project_task(repo_name)
+    current_status_str = project_task.get("status", "Planned") if project_task else "Planned"
+    task_id = project_task.get("id") if project_task else None
+
     current_state = ProjectState(current_status_str.lower()) if current_status_str.lower() in [s.value for s in ProjectState] else ProjectState.PLANNED
 
     wf = WorkflowManager(current_state=current_state)
 
     # Analyze commits to update tasks
+    new_state = None
     for commit in payload.commits:
         msg = commit.message.lower()
         if "deploy" in msg:
             new_state = wf.next("deploy_success")
-            await dashboard.log_activity(
-                user_id=1,
-                action=f"deployed ({new_state.value})",
-                target=repo_name,
-                time="now"
-            )
         elif "test" in msg:
             new_state = wf.next("test_pass")
-            await dashboard.log_activity(
-                user_id=1,
-                action=f"tested ({new_state.value})",
-                target=repo_name,
-                time="now"
-            )
+
+    if new_state:
+        # Update Dashboard State
+        if task_id:
+            # We need to preserve other fields? The DashboardClient.update_task updates what we send?
+            # Ideally we fetch the whole task and update status, or backend supports partial.
+            # Assuming partial update or we just send what we know.
+            # To be safe, we might just send the status update if API supports it,
+            # or merge with what we got from get_project_task.
+            updated_data = project_task.copy() if project_task else {}
+            updated_data["status"] = new_state.value.capitalize()
+            await dashboard.update_task(task_id, updated_data)
+
+        # Log Activity
+        await dashboard.log_activity(
+            user_id=1,
+            action=f"status_change ({new_state.value})",
+            target=repo_name,
+            time="now"
+        )
