@@ -1,10 +1,11 @@
 from fastapi import FastAPI
 from app.core.config import settings
-from app.api import webhooks
+from app.api import webhooks, projects
 
 app = FastAPI(title="Manager Agent", version="0.1.0")
 
 app.include_router(webhooks.router)
+app.include_router(projects.router)
 
 @app.get("/health")
 async def health_check():
