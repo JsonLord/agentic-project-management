@@ -1,0 +1,107 @@
+
+3. API Endpoint Map
+The server exposes several categories of endpoints (found in app/server/routes/routes.go):
+for https://auxteam-plandex.hf.space
+
+Health & Version
+
+GET /: Welcome page.
+GET /health: Health check.
+GET /version: Server version.
+Authentication & Accounts
+
+POST /accounts/email_verifications: Create email verification.
+POST /accounts/email_verifications/check_pin: Check email PIN.
+POST /accounts/sign_in_codes: Create sign-in code.
+POST /accounts/sign_in: Sign in.
+POST /accounts/sign_out: Sign out.
+POST /accounts: Create account.
+Organizations & Users
+
+GET /orgs/session: Get current org session.
+GET /orgs: List organizations.
+POST /orgs: Create organization.
+GET /users: List users.
+DELETE /orgs/users/{userId}: Delete user from org.
+GET /orgs/roles: List organization roles.
+Invites
+
+POST /invites: Invite user.
+GET /invites/pending: List pending invites.
+GET /invites/accepted: List accepted invites.
+GET /invites/all: List all invites.
+DELETE /invites/{inviteId}: Delete invite.
+Projects
+
+POST /projects: Create project.
+GET /projects: List projects.
+PUT /projects/{projectId}/set_plan: Set current plan for project.
+PUT /projects/{projectId}/rename: Rename project.
+POST /projects/{projectId}/plans/current_branches: Get current branch by plan ID.
+POST /finalize: Finalize project.
+Plans
+
+GET /plans: List plans.
+GET /plans/archive: List archived plans.
+GET /plans/ps: List running plans.
+POST /projects/{projectId}/plans: Create plan.
+DELETE /projects/{projectId}/plans: Delete all plans in project.
+GET /plans/{planId}: Get plan.
+DELETE /plans/{planId}: Delete plan.
+GET /plans/{planId}/current_plan/{sha}: Get current plan state by SHA.
+GET /plans/{planId}/{branch}/current_plan: Get current plan state for branch.
+PATCH /plans/{planId}/{branch}/apply: Apply plan changes.
+PATCH /plans/{planId}/archive: Archive plan.
+PATCH /plans/{planId}/unarchive: Unarchive plan.
+PATCH /plans/{planId}/rename: Rename plan.
+PATCH /plans/{planId}/{branch}/reject_all: Reject all changes.
+PATCH /plans/{planId}/{branch}/reject_file: Reject specific file changes.
+PATCH /plans/{planId}/{branch}/reject_files: Reject multiple files.
+GET /plans/{planId}/{branch}/diffs: Get plan diffs.
+PATCH /plans/{planId}/{branch}/rewind: Rewind plan conversation.
+GET /plans/{planId}/{branch}/logs: List plan logs.
+GET /plans/{planId}/{branch}/status: Get plan status.
+POST /plans/{planId}/{branch}/tell: (Streaming) Send instruction to AI.
+PATCH /plans/{planId}/{branch}/build: (Streaming) Trigger AI implementation.
+PATCH /plans/{planId}/{branch}/connect: (Streaming) Connect to active plan stream.
+DELETE /plans/{planId}/{branch}/stop: Stop active plan.
+POST /plans/{planId}/{branch}/respond_missing_file: Respond to missing file request.
+POST /plans/{planId}/{branch}/auto_load_context: Auto-load context for plan.
+GET /plans/{planId}/{branch}/build_status: Get build status.
+Context & File Maps
+
+GET /plans/{planId}/{branch}/context: List context.
+POST /plans/{planId}/{branch}/context: Load context.
+GET /plans/{planId}/{branch}/context/{contextId}/body: Get context body.
+PUT /plans/{planId}/{branch}/context: Update context.
+DELETE /plans/{planId}/{branch}/context: Delete context.
+POST /file_map: Get file map.
+POST /plans/{planId}/{branch}/load_cached_file_map: Load cached file map.
+Models & Settings
+
+GET /custom_models: List custom models.
+POST /custom_models: Upsert custom models.
+GET /custom_models/{modelId}: Get custom model.
+GET /custom_providers: List custom providers.
+GET /custom_providers/{providerId}: Get custom provider.
+GET /model_sets: List model packs.
+POST /model_sets: Create model pack.
+PUT /model_sets/{setId}: Update model pack.
+GET /default_settings: Get default settings.
+PUT /default_settings: Update default settings.
+GET /plans/{planId}/{branch}/settings: Get plan settings.
+PUT /plans/{planId}/{branch}/settings: Update plan settings.
+GET /plans/{planId}/config: Get plan config.
+PUT /plans/{planId}/config: Update plan config.
+GET /default_plan_config: Get default plan config.
+PUT /default_plan_config: Update default plan config.
+GET /org_user_config: Get org user config.
+PUT /org_user_config: Update org user config.
+4. Notable Patterns & Design Decisions
+Stateful Active Plans: The server maintains a SafeMap of ActivePlan objects in memory for running tasks, allowing the CLI to disconnect and reconnect without losing the AI's progress.
+Structured Edits: Instead of simple search/replace, Plandex uses a "structured edit" approach that understands code blocks and line numbers, reducing the risk of "hallucinated" code placements.
+Context Caching: Integration with LiteLLM and specific provider features (like Anthropic/OpenAI caching) to minimize token costs in large projects.
+Graceful Shutdown: The server implements a robust shutdown mechanism that waits for active AI plans to reach a safe state before closing database connections and terminating.
+I have a complete understanding of the repository structure and workflows.
+
+READY for implementation instructions.
